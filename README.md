@@ -1,2 +1,2 @@
-# Enhanced-Momentum.
-3rd year term paper dedicated to making first steps in quantitative finance. 
+# Cross-Market-Momentum.
+What began as a project as part of a summer academic internship may one day become a platform for quantitative research...
