@@ -106,5 +106,18 @@ data/results_regime_v4/*scaled_daily*.csv
 # Ignore structural break intermediate features
 data/results_structural_breaks/structural_break_monthly_features.csv
 
+# Experiment outputs
+results/*/runs/
+results/**/runs/
+
+# Keep result folders in git via .gitkeep
+!results/
+!results/us/
+!results/moex/
+!results/crypto/
+!results/us/.gitkeep
+!results/moex/.gitkeep
+!results/crypto/.gitkeep
+
 # Ignore heavy parquet artifacts globally
 *.parquet

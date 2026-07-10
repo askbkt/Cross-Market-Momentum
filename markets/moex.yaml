@@ -1,0 +1,54 @@
+market: moex
+description: "MOEX equities — liquid TQBR universe"
+
+# Data source
+api_base_url: "https://iss.moex.com/iss"
+board: TQBR
+data_dir: data/moex
+
+# Market proxy
+market_proxy: IMOEX
+
+# Universe construction
+universe:
+  min_trading_days: 126
+  min_daily_volume_rub: 10_000_000  # 10M RUB
+  exclude_tickers: []
+  # Dynamic: rebuild presence matrix each rebalancing date
+  # based on trailing liquidity
+
+# Backtest settings
+rebal_freq: ME
+hedge_instrument: null  # no hedge or IMOEX futures
+
+# Walk-forward folds
+walk_forward:
+  folds:
+    - {train_start: "2010-01-01", train_end: "2015-12-31", test_start: "2016-01-01", test_end: "2017-12-31"}
+    - {train_start: "2012-01-01", train_end: "2017-12-31", test_start: "2018-01-01", test_end: "2019-12-31"}
+    - {train_start: "2014-01-01", train_end: "2019-12-31", test_start: "2020-01-01", test_end: "2021-12-31"}
+    - {train_start: "2016-01-01", train_end: "2021-12-31", test_start: "2022-01-01", test_end: "2024-12-31"}
+  oos: {start: "2022-01-01", end: "2024-12-31"}
+
+# Grid search (compact)
+grid:
+  quantile: [0.20, 0.30, 0.40]
+  window_days: [126, 252, 365]
+  exclude_last_days: [21, 30]
+  volatility_scaling: true
+  vol_window_days: 21
+  return_type: simple
+  mode: long_short
+  weighting_scheme: equally_weighted
+
+# Transaction costs
+tc_bps: [10, 20]
+
+# Results output
+results_dir: results/moex
+
+# Known caveats
+caveats:
+  - "MOEX ISS API may return unadjusted prices — dividend gaps not corrected"
+  - "Small universe (<50 liquid stocks) limits quantile-based sorting"
+  - "2022 sanctions / structural break — treat as regime event, not outlier"

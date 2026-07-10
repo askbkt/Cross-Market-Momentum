@@ -1,0 +1,48 @@
+market: us
+description: "US equities — Russell 3000 (supervisor-provided dataset)"
+
+# Data source
+source_dir: data/datasets
+df_filename: top3000_data_df.parquet
+presence_filename: top3000_presence_matrix.parquet
+mkt_caps_filename: top3000_market_caps.parquet
+dividends_filename: top3000_dividends.parquet
+
+# Data output
+data_dir: data/us
+
+# Market proxy & factor columns inside the data panel
+market_proxy_col: spx
+momentum_factor_col: momentum
+
+# Backtest settings
+rebal_freq: ME
+hedge_freq: ME
+hedge_instrument: spx_futures
+
+# Walk-forward folds
+walk_forward:
+  folds:
+    - {train_start: "2010-01-01", train_end: "2014-12-31", test_start: "2015-01-01", test_end: "2015-12-31"}
+    - {train_start: "2010-01-01", train_end: "2015-12-31", test_start: "2016-01-01", test_end: "2016-12-31"}
+    - {train_start: "2010-01-01", train_end: "2016-12-31", test_start: "2017-01-01", test_end: "2017-12-31"}
+    - {train_start: "2010-01-01", train_end: "2017-12-31", test_start: "2018-01-01", test_end: "2018-12-31"}
+    - {train_start: "2010-01-01", train_end: "2018-12-31", test_start: "2019-01-01", test_end: "2019-12-31"}
+  oos: {start: "2020-01-01", end: "2023-12-31"}
+
+# Grid search
+grid:
+  quantile: [0.10, 0.12, 0.20, 0.30]
+  window_days: [126, 252, 504, 756]
+  exclude_last_days: [21, 42, 63, 84]
+  volatility_scaling: true
+  vol_window_days: 21
+  return_type: simple
+  mode: long_short
+  weighting_scheme: equally_weighted
+
+# Transaction costs
+tc_bps: 25
+
+# Results output
+results_dir: results/us
