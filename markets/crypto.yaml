@@ -1,58 +1,76 @@
 market: crypto
-description: "Crypto — Binance spot top liquid pairs vs USDT"
-
-# Data source
-api_base_url: "https://api.binance.com"
+description: Crypto — Binance spot top liquid pairs vs USDT
+api_base_url: https://api.binance.com
 quote_asset: USDT
 data_dir: data/crypto
-
-# Market proxy
 market_proxy: BTCUSDT
-
-# Universe construction
 universe:
   top_n: 50
-  min_daily_volume_usd: 1_000_000
+  min_daily_volume_usd: 1000000
+  segment_gap_days: 7
   exclude_categories:
-    - stablecoins    # USDT, USDC, BUSD, DAI, TUSD, etc.
-    - leveraged      # UP/DOWN tokens
-    - wrapped        # WBTC, WETH on Binance
-  exclude_symbols: [BUSDUSDT, USDCUSDT, DAIUSDT, TUSDUSDT, FDUSDUSDT]
-  # Dynamic: rebuild by trailing 30d volume each rebalancing date
-
-# Backtest settings
-rebal_freq: ME  # monthly; weekly as stretch goal
-hedge_instrument: null  # no hedge or BTC
-
-# Walk-forward folds
+    - stablecoins
+    - leveraged
+    - wrapped
+  exclude_symbols:
+    - BUSDUSDT
+    - USDCUSDT
+    - DAIUSDT
+    - TUSDUSDT
+    - FDUSDUSDT
+  exclude_bases:
+    - AEUR
+    - EURI
+    - EURITE
+    - PYUSD
+rebal_freq: ME
+hedge_instrument: null
 walk_forward:
   folds:
-    - {train_start: "2018-01-01", train_end: "2020-12-31", test_start: "2021-01-01", test_end: "2021-12-31"}
-    - {train_start: "2019-01-01", train_end: "2021-12-31", test_start: "2022-01-01", test_end: "2022-12-31"}
-    - {train_start: "2020-01-01", train_end: "2022-12-31", test_start: "2023-01-01", test_end: "2024-12-31"}
-  oos: {start: "2023-01-01", end: "2025-06-30"}
-
-# Grid search (crypto-specific: shorter lookbacks)
+  - train_start: '2018-01-01'
+    train_end: '2020-12-31'
+    test_start: '2021-01-01'
+    test_end: '2021-12-31'
+  - train_start: '2019-01-01'
+    train_end: '2021-12-31'
+    test_start: '2022-01-01'
+    test_end: '2022-12-31'
+  - train_start: '2020-01-01'
+    train_end: '2022-12-31'
+    test_start: '2023-01-01'
+    test_end: '2024-12-31'
+  oos:
+    start: '2023-01-01'
+    end: '2025-06-30'
 grid:
-  quantile: [0.20, 0.30, 0.40]
-  window_days: [30, 90, 180]
-  exclude_last_days: [7, 14]
+  quantile:
+  - 0.2
+  - 0.3
+  - 0.4
+  window_days:
+  - 30
+  - 90
+  - 180
+  exclude_last_days:
+  - 7
+  - 14
   volatility_scaling: true
   vol_window_days: 21
   return_type: simple
   mode: long_short
   weighting_scheme: equally_weighted
-
-# Transaction costs
-tc_bps: [5, 10, 20]
-
-# Results output
+tc_bps:
+- 5
+- 10
+- 20
 results_dir: results/crypto
-
-# Known caveats
 caveats:
-  - "Survivorship bias: coins delist and disappear from Binance"
-  - "Listing bias: new coins enter universe mid-sample"
-  - "24/7 trading — no natural close; Binance uses 00:00 UTC candle close"
-  - "Extreme returns common (>20% daily) — not necessarily data errors"
-  - "Market proxy (BTC) is also in the universe — creates mild circularity"
+- Historical universe is discovered from Binance Public Data archive; archive files
+  may be revised by Binance
+- 'Listing bias: new coins enter universe mid-sample'
+- 24/7 trading — no natural close; Binance uses 00:00 UTC candle close
+- Extreme returns common (>20% daily) — not necessarily data errors
+- Market proxy (BTC) is also in the universe — creates mild circularity
+start_date: '2018-01-01'
+end_date: '2025-06-30'
+refresh_universe: false
