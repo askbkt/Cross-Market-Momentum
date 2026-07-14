@@ -10,6 +10,15 @@ from enhanced_momentum.config.project_experiment_config import ProjectExperiment
 from enhanced_momentum.data_loaders.base import BaseLoader, MarketData
 from quant_pml.dataset.dataset_data import DatasetData
 
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _resolve_source_dir(config: dict[str, Any]) -> Path:
+    """Resolve the configured US data directory against the repository root."""
+    source = Path(config.get("source_dir", "data/datasets")).expanduser()
+    if not source.is_absolute():
+        source = PROJECT_ROOT / source
+    return source.resolve()
 
 class USLoader(BaseLoader):
     """Loader for the existing US Russell 3000 parquet dataset.
@@ -22,7 +31,7 @@ class USLoader(BaseLoader):
     """
 
     def fetch(self) -> None:
-        source = Path(self.config.get("source_dir", "data/datasets"))
+        source = _resolve_source_dir(self.config)
         required = [
             self.config.get("df_filename", "top3000_data_df.parquet"),
             self.config.get("presence_filename", "top3000_presence_matrix.parquet"),
@@ -39,7 +48,7 @@ class USLoader(BaseLoader):
         """Build the quant-pml experiment config from markets/us.yaml."""
         cfg = ProjectExperimentConfig()
 
-        source_dir = Path(self.config.get("source_dir", "data/datasets"))
+        source_dir = _resolve_source_dir(self.config)
         cfg.PREFIX = self.config.get("prefix", "")
         cfg.PATH_OUTPUT = source_dir
         cfg.DF_FILENAME = self.config.get("df_filename", "top3000_data_df.parquet")
@@ -111,7 +120,7 @@ class USLoader(BaseLoader):
             dividends=dividends,
             metadata={
                 "market": "us",
-                "source": str(Path(self.config.get("source_dir", "data/datasets"))),
+                "source": str(_resolve_source_dir(self.config)),
                 "universe": "Russell 3000",
                 "description": "Supervisor-provided US equity dataset",
             },
@@ -120,7 +129,7 @@ class USLoader(BaseLoader):
     def _read_source_files(
         self,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None]:
-        source = Path(self.config.get("source_dir", "data/datasets"))
+        source = _resolve_source_dir(self.config)
 
         df_filename = self.config.get("df_filename", "top3000_data_df.parquet")
         presence_filename = self.config.get("presence_filename", "top3000_presence_matrix.parquet")
