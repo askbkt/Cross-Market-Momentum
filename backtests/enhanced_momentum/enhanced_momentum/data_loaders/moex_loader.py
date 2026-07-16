@@ -46,6 +46,202 @@ _SESSION.mount("https://", _ADAPTER)
 
 
 # =====================================================================
+# Confirmed corporate-action price adjustments
+# =====================================================================
+
+# Raw ISS history can contain mechanical price jumps when the number of shares
+# changes through a confirmed consolidation/reverse split. For cross-time
+# return comparability, historical prices before the effective date are scaled
+# into the post-action share unit.
+#
+# IMPORTANT:
+# - only confirmed corporate actions belong here;
+# - do not infer adjustments automatically from extreme returns;
+# - raw per-security cache files remain untouched;
+# - adjustments are applied only when building the processed close panel.
+_MOEX_PRICE_ADJUSTMENTS: dict[str, tuple[dict[str, Any], ...]] = {
+    "IRAO": (
+        {
+            "effective_date": "2015-01-20",
+            "factor": 100.0,
+            "reason": "share_consolidation_100_to_1",
+        },
+    ),
+    "VTBR": (
+        {
+            "effective_date": "2024-07-15",
+            "factor": 5000.0,
+            "reason": "share_consolidation_5000_to_1",
+        },
+    ),
+}
+
+
+def _apply_confirmed_price_adjustments(
+    close: pd.DataFrame,
+) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+    """Apply confirmed split/consolidation adjustments to the close panel.
+
+    Each factor rescales prices strictly before the corporate-action effective
+    date into the post-action share unit. The raw downloaded cache is not
+    modified.
+
+    Returns
+    -------
+    adjusted_close
+        Price panel with confirmed historical adjustments applied.
+    applied_adjustments
+        Machine-readable provenance records for adjustments that were relevant
+        to columns present in the current panel.
+    """
+    adjusted = close.copy()
+    applied_adjustments: list[dict[str, Any]] = []
+
+    for ticker, actions in _MOEX_PRICE_ADJUSTMENTS.items():
+        if ticker not in adjusted.columns:
+            continue
+
+        for action in actions:
+            effective_date = pd.Timestamp(
+                action["effective_date"]
+            )
+            factor = float(action["factor"])
+            reason = str(action["reason"])
+
+            if factor <= 0:
+                raise ValueError(
+                    f"Invalid MOEX price-adjustment factor for {ticker}: "
+                    f"{factor}"
+                )
+
+            historical_mask = (
+                adjusted.index < effective_date
+            )
+
+            n_adjusted = int(
+                adjusted.loc[
+                    historical_mask,
+                    ticker,
+                ]
+                .notna()
+                .sum()
+            )
+
+            if n_adjusted == 0:
+                logger.warning(
+                    "Confirmed price adjustment for %s at %s has no "
+                    "pre-event observations in the current panel",
+                    ticker,
+                    effective_date.date(),
+                )
+                continue
+
+            # Diagnostics before applying the adjustment.
+            previous_raw = (
+                adjusted.loc[
+                    adjusted.index < effective_date,
+                    ticker,
+                ]
+                .dropna()
+            )
+
+            post_raw = (
+                adjusted.loc[
+                    adjusted.index >= effective_date,
+                    ticker,
+                ]
+                .dropna()
+            )
+
+            previous_close = (
+                float(previous_raw.iloc[-1])
+                if not previous_raw.empty
+                else None
+            )
+
+            first_post_close = (
+                float(post_raw.iloc[0])
+                if not post_raw.empty
+                else None
+            )
+
+            adjusted.loc[
+                historical_mask,
+                ticker,
+            ] = (
+                adjusted.loc[
+                    historical_mask,
+                    ticker,
+                ]
+                * factor
+            )
+
+            raw_ratio = (
+                first_post_close / previous_close
+                if (
+                    previous_close is not None
+                    and first_post_close is not None
+                    and previous_close > 0
+                )
+                else None
+            )
+
+            adjusted_ratio = (
+                first_post_close
+                / (
+                    previous_close
+                    * factor
+                )
+                if (
+                    previous_close is not None
+                    and first_post_close is not None
+                    and previous_close > 0
+                )
+                else None
+            )
+
+            record = {
+                "ticker": ticker,
+                "effective_date": (
+                    effective_date
+                    .date()
+                    .isoformat()
+                ),
+                "factor": factor,
+                "reason": reason,
+                "n_adjusted_observations": n_adjusted,
+                "last_pre_event_close_raw": previous_close,
+                "first_post_event_close_raw": first_post_close,
+                "raw_price_ratio": raw_ratio,
+                "post_adjustment_price_ratio": adjusted_ratio,
+            }
+
+            applied_adjustments.append(record)
+
+            logger.info(
+                "Applied confirmed MOEX price adjustment: "
+                "%s, effective=%s, factor=%g, observations=%d, "
+                "raw_ratio=%s, adjusted_ratio=%s",
+                ticker,
+                effective_date.date(),
+                factor,
+                n_adjusted,
+                (
+                    f"{raw_ratio:.6f}"
+                    if raw_ratio is not None
+                    else "n/a"
+                ),
+                (
+                    f"{adjusted_ratio:.6f}"
+                    if adjusted_ratio is not None
+                    else "n/a"
+                ),
+            )
+
+    return adjusted, applied_adjustments
+
+
+# =====================================================================
 # ISS helpers
 # =====================================================================
 
@@ -806,6 +1002,30 @@ class MOEXLoader(BaseLoader):
         close = _build_wide_panel(long_df, "close")
         close.index = pd.to_datetime(close.index)
 
+        # Confirmed corporate actions are applied at the processed-panel layer.
+        # Raw cache files remain unchanged and can always be audited/rebuilt.
+        close, applied_price_adjustments = (
+            _apply_confirmed_price_adjustments(
+                close
+            )
+        )
+
+        # Persist adjustment provenance alongside processed panels.
+        adjustments_path = (
+            self.data_dir
+            / "price_adjustments_applied.json"
+        )
+
+        adjustments_path.write_text(
+            json.dumps(
+                applied_price_adjustments,
+                ensure_ascii=False,
+                indent=2,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+
         # P1.10: Volume is traded value in RUB when available
         volume = None
         volume_type = "shares"
@@ -888,6 +1108,11 @@ class MOEXLoader(BaseLoader):
                 "universe": "Historical TQBR (including delisted)",
                 "volume_type": volume_type,
                 "close_price_field": "CLOSE (LEGALCLOSEPRICE as fallback)",
+                "price_adjustment_policy": (
+                    "confirmed corporate actions only; historical pre-event "
+                    "prices rescaled into post-action share units"
+                ),
+                "price_adjustments_applied": applied_price_adjustments,
                 "presence_rule": f"traded >= {ratio:.0%} of last {window} days",
                 "liquidity_lag": "1 day",
                 "caveats": self.config.get("caveats", []),

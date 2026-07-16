@@ -47,6 +47,8 @@ def _assert_smoke_invariants(result) -> None:
     returns = result.daily_returns
     nav = result.nav
     turnover = result.turnover
+    gross_exposure = result.daily_gross_exposure
+    net_exposure = result.daily_net_exposure
     diag = result.rebalance_diagnostics
 
     assert not returns.empty, "daily_returns is empty"
@@ -80,6 +82,25 @@ def _assert_smoke_invariants(result) -> None:
     assert (
         result.stale_held_gross_exposure >= 0
     ).all(), "stale held exposure contains negative values"
+
+    invested = gross_exposure > 0
+    if invested.any():
+        assert np.allclose(
+            gross_exposure[invested].to_numpy(dtype=float),
+            result.config.gross_exposure,
+            atol=1e-10,
+            rtol=0.0,
+        ), "fixed-sleeve gross exposure drifted"
+        assert np.allclose(
+            net_exposure[invested].to_numpy(dtype=float),
+            0.0,
+            atol=1e-10,
+            rtol=0.0,
+        ), "fixed-sleeve net exposure drifted"
+
+    assert (returns > -1.0).all(), (
+        "daily return reached or crossed -100%"
+    )
 
     recoveries = result.stale_recovery_events
     if not recoveries.empty:
@@ -152,6 +173,11 @@ def run_one_market(market: str) -> None:
         "avg_n_eligible",
         "avg_n_long",
         "avg_n_short",
+        "min_n_long",
+        "min_n_short",
+        "min_daily_gross_exposure",
+        "max_daily_gross_exposure",
+        "max_abs_daily_net_exposure",
         "days_with_stale_held_prices",
         "avg_stale_held_gross_exposure",
         "max_stale_held_gross_exposure",

@@ -11,6 +11,7 @@ from enhanced_momentum.data_loaders.base import MarketData
 
 
 StalePricePolicy = Literal["last_observation_carried_forward"]
+PortfolioAccounting = Literal["fixed_notional_sleeves"]
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,11 @@ class CrossMarketBacktestConfig:
         the position is marked at its last observed close (0% return while the
         quote is stale), and the full price change is recognized when a new
         close appears.
+    portfolio_accounting
+        Fixed-notional long-short factor accounting. The long and short sleeves
+        each retain half of total gross exposure between scheduled rebalances.
+        Asset weights drift within each sleeve, but losses in total strategy NAV
+        cannot mechanically lever both sleeves.
     """
 
     lookback_days: int
@@ -54,6 +60,7 @@ class CrossMarketBacktestConfig:
     min_eligible_assets: int = 2
     annualization_days: int | None = None
     stale_price_policy: StalePricePolicy = "last_observation_carried_forward"
+    portfolio_accounting: PortfolioAccounting = "fixed_notional_sleeves"
 
     def __post_init__(self) -> None:
         if self.lookback_days < 2:
@@ -73,6 +80,11 @@ class CrossMarketBacktestConfig:
                 "Only stale_price_policy='last_observation_carried_forward' "
                 "is currently supported."
             )
+        if self.portfolio_accounting != "fixed_notional_sleeves":
+            raise ValueError(
+                "Only portfolio_accounting='fixed_notional_sleeves' "
+                "is currently supported."
+            )
 
 
 @dataclass
@@ -84,6 +96,8 @@ class CrossMarketBacktestResult:
     daily_returns: pd.Series
     nav: pd.Series
     turnover: pd.Series
+    daily_gross_exposure: pd.Series
+    daily_net_exposure: pd.Series
     rebalance_diagnostics: pd.DataFrame
     stale_held_gross_exposure: pd.Series
     stale_price_events: pd.DataFrame
@@ -149,6 +163,30 @@ class CrossMarketBacktestResult:
             if not diagnostics.empty
             else np.nan
         )
+        min_n_long = (
+            int(diagnostics["n_long"].min())
+            if not diagnostics.empty
+            else 0
+        )
+        min_n_short = (
+            int(diagnostics["n_short"].min())
+            if not diagnostics.empty
+            else 0
+        )
+
+        gross_exposure = (
+            self.daily_gross_exposure
+            .reindex(r.index)
+            .fillna(0.0)
+            .astype(float)
+        )
+        net_exposure = (
+            self.daily_net_exposure
+            .reindex(r.index)
+            .fillna(0.0)
+            .astype(float)
+        )
+        invested_gross = gross_exposure[gross_exposure > 0]
 
         stale = self.stale_held_gross_exposure.reindex(r.index).fillna(0.0)
         recoveries = self.stale_recovery_events
@@ -162,6 +200,7 @@ class CrossMarketBacktestResult:
                 "rebal_freq": self.config.rebal_freq,
                 "gross_exposure": self.config.gross_exposure,
                 "transaction_cost_bps": self.config.transaction_cost_bps,
+                "portfolio_accounting": self.config.portfolio_accounting,
                 "annualization_days": ann,
                 "start_date": r.index.min().date().isoformat(),
                 "end_date": r.index.max().date().isoformat(),
@@ -186,6 +225,15 @@ class CrossMarketBacktestResult:
                 "avg_n_eligible": avg_n_eligible,
                 "avg_n_long": avg_n_long,
                 "avg_n_short": avg_n_short,
+                "min_n_long": min_n_long,
+                "min_n_short": min_n_short,
+                "min_daily_gross_exposure": (
+                    float(invested_gross.min())
+                    if not invested_gross.empty
+                    else 0.0
+                ),
+                "max_daily_gross_exposure": float(gross_exposure.max()),
+                "max_abs_daily_net_exposure": float(net_exposure.abs().max()),
                 "days_with_stale_held_prices": int((stale > 0).sum()),
                 "avg_stale_held_gross_exposure": float(stale.mean()),
                 "max_stale_held_gross_exposure": float(stale.max()),
@@ -278,8 +326,68 @@ def _validate_market_data(
     return close, returns, presence
 
 
+def market_observation_index(
+    data: MarketData,
+    *,
+    close: pd.DataFrame | None = None,
+) -> pd.DatetimeIndex:
+    """Return the authoritative market-session calendar.
+
+    The market proxy return series is the primary session indicator:
+    - US: broad equity-market proxy;
+    - MOEX: IMOEX;
+    - crypto: BTCUSDT.
+
+    This avoids treating sparse asset-level prints during a broad market
+    closure as normal sessions. The close-panel calendar is retained for
+    valuation and stale-price accounting.
+
+    If the loader has no usable proxy, the function falls back to dates with
+    at least one observed asset close.
+    """
+    panel = data.close if close is None else close
+
+    if not isinstance(panel.index, pd.DatetimeIndex):
+        raise TypeError("close index must be a DatetimeIndex.")
+
+    close_has_observation = panel.notna().any(axis=1)
+
+    proxy = data.market_proxy_returns
+
+    if isinstance(proxy, pd.Series) and not proxy.empty:
+        proxy = proxy.copy()
+
+        if not isinstance(proxy.index, pd.DatetimeIndex):
+            proxy.index = pd.to_datetime(proxy.index)
+
+        if proxy.index.has_duplicates:
+            proxy = proxy.groupby(level=0).last()
+
+        if not proxy.index.is_monotonic_increasing:
+            proxy = proxy.sort_index()
+
+        proxy = pd.to_numeric(proxy, errors="coerce").reindex(panel.index)
+
+        proxy_session = proxy.notna() & close_has_observation
+
+        if int(proxy_session.sum()) >= 2:
+            observation_index = pd.DatetimeIndex(
+                panel.index[proxy_session.to_numpy()]
+            )
+            return observation_index
+
+    fallback_index = pd.DatetimeIndex(
+        panel.index[close_has_observation.to_numpy()]
+    )
+
+    if fallback_index.empty:
+        raise ValueError("No market observations found in close panel.")
+
+    return fallback_index
+
+
 def _rebalance_dates(index: pd.DatetimeIndex, freq: str) -> pd.DatetimeIndex:
-    """Return the last available observation for each rebalance period."""
+    """Return the last market-observation date in each rebalance period."""
     freq_norm = freq.strip().upper()
 
     if freq_norm in {"M", "ME", "MONTHLY"}:
@@ -304,9 +412,11 @@ def compute_momentum_scores(
 ) -> tuple[pd.Series, pd.Timestamp, pd.Timestamp] | None:
     """Compute classic price momentum at one rebalance point.
 
-    The signal uses exactly ``lookback_days`` observations and excludes the
-    most recent ``skip_days`` observations. The score is P_end / P_start - 1.
-    Exact start and end prices are required.
+    The supplied ``close`` panel must already be restricted to dates with at
+    least one market observation. The signal therefore uses exactly
+    ``lookback_days`` market sessions and excludes the most recent
+    ``skip_days`` market sessions. The score is P_end / P_start - 1.
+    Exact asset-level start and end prices are still required.
     """
     signal_end_pos = rebalance_pos - skip_days
     signal_start_pos = signal_end_pos - lookback_days + 1
@@ -381,6 +491,95 @@ def build_long_short_target(
     }
 
 
+
+def _drift_fixed_notional_sleeves(
+    current_weights: pd.Series,
+    realized_returns: pd.Series,
+    *,
+    gross_exposure: float,
+) -> pd.Series:
+    """Drift asset weights within each leg while keeping leg notionals fixed.
+
+    The long sleeve is normalized back to +gross_exposure / 2 and the short
+    sleeve to -gross_exposure / 2 after each observation. This represents a
+    long-short factor portfolio rather than an unconstrained self-financing
+    account whose leverage explodes when total NAV falls.
+    """
+    weights = current_weights.astype(float)
+    realized = (
+        realized_returns
+        .reindex(weights.index)
+        .fillna(0.0)
+        .astype(float)
+    )
+
+    if not np.isfinite(realized.to_numpy()).all():
+        raise RuntimeError("Non-finite realized returns during sleeve drift.")
+
+    gross_per_sleeve = gross_exposure / 2.0
+    updated_parts: list[pd.Series] = []
+
+    long_weights = weights[weights > 0]
+    if not long_weights.empty:
+        long_growth = (
+            long_weights
+            * (1.0 + realized.loc[long_weights.index])
+        )
+        long_total = float(long_growth.sum())
+
+        if not np.isfinite(long_total) or long_total <= 0:
+            raise RuntimeError(
+                "Long sleeve value became non-positive during drift."
+            )
+
+        updated_parts.append(
+            long_growth
+            / long_total
+            * gross_per_sleeve
+        )
+
+    short_weights = weights[weights < 0]
+    if not short_weights.empty:
+        short_growth = (
+            short_weights.abs()
+            * (1.0 + realized.loc[short_weights.index])
+        )
+        short_total = float(short_growth.sum())
+
+        if not np.isfinite(short_total) or short_total <= 0:
+            raise RuntimeError(
+                "Short sleeve underlying value became non-positive during drift."
+            )
+
+        updated_parts.append(
+            -short_growth
+            / short_total
+            * gross_per_sleeve
+        )
+
+    if not updated_parts:
+        return pd.Series(dtype=float)
+
+    updated = pd.concat(updated_parts).astype(float)
+    updated = updated[updated != 0.0]
+
+    gross = float(updated.abs().sum())
+    net = float(updated.sum())
+
+    if not np.isclose(gross, gross_exposure, atol=1e-10, rtol=0.0):
+        raise RuntimeError(
+            "Fixed-sleeve drift violated gross exposure: "
+            f"expected={gross_exposure}, actual={gross}"
+        )
+
+    if not np.isclose(net, 0.0, atol=1e-10, rtol=0.0):
+        raise RuntimeError(
+            "Fixed-sleeve drift violated market neutrality: "
+            f"net={net}"
+        )
+
+    return updated
+
 def run_cross_market_backtest(
     data: MarketData,
     config: CrossMarketBacktestConfig,
@@ -397,7 +596,16 @@ def run_cross_market_backtest(
     2. Eligibility is read from raw close + presence on that decision date.
     3. The target portfolio becomes effective on the next available date.
     4. Returns are realized forward, so there is no same-day look-ahead.
-    5. Between rebalances, positions drift with realized asset returns.
+    5. Between rebalances, asset weights drift within fixed-notional long
+       and short sleeves. Each sleeve retains half of total gross exposure.
+
+    Portfolio accounting
+    --------------------
+    The strategy is represented as a fixed-notional long-short factor:
+    +gross/2 in the long sleeve and -gross/2 in the short sleeve. Each sleeve
+    evolves using its own asset returns and is normalized independently after
+    each observation. This prevents losses in total strategy NAV from
+    mechanically creating unconstrained leverage.
 
     Valuation convention
     --------------------
@@ -419,6 +627,8 @@ def run_cross_market_backtest(
 
     market = str(data.metadata.get("market", "unknown")).lower()
     idx = close.index
+    session_index = market_observation_index(data, close=close)
+    signal_close = close.loc[session_index]
 
     start_ts = pd.Timestamp(start_date) if start_date is not None else idx.min()
     end_ts = pd.Timestamp(end_date) if end_date is not None else idx.max()
@@ -429,7 +639,10 @@ def run_cross_market_backtest(
     # Build decisions over the full history and filter by EFFECTIVE date below.
     # This lets a month-end decision immediately before start_date create the
     # portfolio held from the first available observation in the test period.
-    candidate_rebalances = _rebalance_dates(idx, config.rebal_freq)
+    candidate_rebalances = _rebalance_dates(
+        session_index,
+        config.rebal_freq,
+    )
 
     effective_targets: dict[pd.Timestamp, pd.Series] = {}
     effective_decision_dates: dict[pd.Timestamp, pd.Timestamp] = {}
@@ -441,16 +654,22 @@ def run_cross_market_backtest(
     # ================================================================
     for decision_date in candidate_rebalances:
         decision_date = pd.Timestamp(decision_date)
-        rebalance_pos = idx.get_loc(decision_date)
 
-        if not isinstance(rebalance_pos, (int, np.integer)):
+        signal_rebalance_pos = session_index.get_loc(
+            decision_date
+        )
+
+        if not isinstance(
+            signal_rebalance_pos,
+            (int, np.integer),
+        ):
             raise RuntimeError(
-                "Unexpected non-scalar rebalance index location."
+                "Unexpected non-scalar signal-calendar location."
             )
 
         score_result = compute_momentum_scores(
-            close,
-            rebalance_pos=int(rebalance_pos),
+            signal_close,
+            rebalance_pos=int(signal_rebalance_pos),
             lookback_days=config.lookback_days,
             skip_days=config.skip_days,
         )
@@ -481,11 +700,15 @@ def run_cross_market_backtest(
             min_eligible_assets=config.min_eligible_assets,
         )
 
-        next_pos = int(rebalance_pos) + 1
-        if next_pos >= len(idx):
+        next_session_pos = int(signal_rebalance_pos) + 1
+        if next_session_pos >= len(session_index):
             continue
 
-        effective_date = pd.Timestamp(idx[next_pos])
+        # A target becomes effective on the next actual market session,
+        # not on an intervening closure row in the valuation calendar.
+        effective_date = pd.Timestamp(
+            session_index[next_session_pos]
+        )
 
         if effective_date < start_ts or effective_date > end_ts:
             continue
@@ -548,6 +771,8 @@ def run_cross_market_backtest(
 
     daily_returns: dict[pd.Timestamp, float] = {}
     turnover: dict[pd.Timestamp, float] = {}
+    gross_exposure_records: dict[pd.Timestamp, float] = {}
+    net_exposure_records: dict[pd.Timestamp, float] = {}
     stale_exposure: dict[pd.Timestamp, float] = {}
     stale_price_records: list[dict[str, object]] = []
     stale_recovery_records: list[dict[str, object]] = []
@@ -627,6 +852,15 @@ def run_cross_market_backtest(
                     index=current_weights.index,
                     dtype=int,
                 )
+
+        # Exposure is recorded after any scheduled rebalance and before
+        # the current observation's return is applied.
+        gross_exposure_records[date] = float(
+            current_weights.abs().sum()
+        )
+        net_exposure_records[date] = float(
+            current_weights.sum()
+        )
 
         # ------------------------------------------------------------
         # No positions: portfolio is entirely in cash
@@ -844,27 +1078,28 @@ def run_cross_market_backtest(
         stale_exposure[date] = stale_gross
 
         # ------------------------------------------------------------
-        # Drift positions to end-of-day weights
+        # Drift within fixed-notional long and short sleeves
         # ------------------------------------------------------------
         if current_weights.empty:
             continue
 
-        denominator = 1.0 + net_portfolio_return
+        if not np.isfinite(net_portfolio_return):
+            raise RuntimeError(
+                f"Non-finite strategy return on {date.date()}."
+            )
 
-        if denominator <= 0:
-            # Portfolio has lost 100% or more of NAV. Stop rather than
-            # continue with economically meaningless negative NAV.
-            break
+        if net_portfolio_return <= -1.0:
+            raise RuntimeError(
+                "Strategy daily return reached or crossed -100% even under "
+                "fixed-notional sleeve accounting: "
+                f"date={date.date()}, return={net_portfolio_return:.6f}"
+            )
 
-        current_weights = (
-            current_weights
-            * (1.0 + realized)
-            / denominator
+        current_weights = _drift_fixed_notional_sleeves(
+            current_weights,
+            realized,
+            gross_exposure=config.gross_exposure,
         )
-
-        current_weights = current_weights[
-            current_weights != 0.0
-        ]
 
         # Keep valuation state aligned with the sparse holdings vector.
         current_marks = current_marks.reindex(
@@ -890,6 +1125,24 @@ def run_cross_market_backtest(
     turnover_s = pd.Series(
         turnover,
         name="turnover",
+        dtype=float,
+    ).reindex(
+        daily_returns_s.index,
+        fill_value=0.0,
+    )
+
+    gross_exposure_s = pd.Series(
+        gross_exposure_records,
+        name="daily_gross_exposure",
+        dtype=float,
+    ).reindex(
+        daily_returns_s.index,
+        fill_value=0.0,
+    )
+
+    net_exposure_s = pd.Series(
+        net_exposure_records,
+        name="daily_net_exposure",
         dtype=float,
     ).reindex(
         daily_returns_s.index,
@@ -978,6 +1231,8 @@ def run_cross_market_backtest(
         daily_returns=daily_returns_s,
         nav=nav,
         turnover=turnover_s,
+        daily_gross_exposure=gross_exposure_s,
+        daily_net_exposure=net_exposure_s,
         rebalance_diagnostics=diagnostics,
         stale_held_gross_exposure=stale_exposure_s,
         stale_price_events=stale_price_events,

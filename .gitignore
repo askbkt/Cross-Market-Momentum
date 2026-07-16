@@ -123,3 +123,14 @@ results/**/runs/
 
 # Ignore heavy parquet artifacts globally
 *.parquet
+# Cross-market local datasets and caches
+/backtests/enhanced_momentum/data/
+
+# Superseded baseline grids
+/results/baseline_grid_v1/
+/results/baseline_grid_v2/
+/results/baseline_grid_v3/
+/results/baseline_grid_v4/
+
+# Heavy per-run baseline artifacts
+/results/baseline_grid_v5/runs/
