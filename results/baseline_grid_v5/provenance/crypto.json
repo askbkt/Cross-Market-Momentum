@@ -1,0 +1,17 @@
+{
+  "auto_common_start": "2020-05-01",
+  "data_end": "2025-06-30",
+  "data_start": "2018-01-01",
+  "engine_source_path": "/Users/asscar/PycharmProjects/Cross-Market-Momentum/backtests/enhanced_momentum/enhanced_momentum/backtesting/cross_market_backtest.py",
+  "engine_source_sha256": "c1684058f592202acce1b580ad1e00d178eac17c91932e6a0fbcd4b42d5e604a",
+  "engine_version": "unified_cross_market_baseline_v4_proxy_sessions",
+  "evaluation_end": "2025-06-30",
+  "evaluation_start": "2020-05-01",
+  "market": "crypto",
+  "market_config_path": "/Users/asscar/PycharmProjects/Cross-Market-Momentum/markets/crypto.yaml",
+  "market_config_sha256": "8b604a4c5bd768e49c6b76c36c16ad993afa8a9e56010d82f3afb9f97daecf8a",
+  "n_assets": 537,
+  "n_data_dates": 2738,
+  "n_market_observation_dates": 2737,
+  "n_market_wide_missing_dates": 1
+}

@@ -1,0 +1,17 @@
+{
+  "auto_common_start": "1992-01-02",
+  "data_end": "2024-12-31",
+  "data_start": "1979-12-31",
+  "engine_source_path": "/Users/asscar/PycharmProjects/Cross-Market-Momentum/backtests/enhanced_momentum/enhanced_momentum/backtesting/cross_market_backtest.py",
+  "engine_source_sha256": "c1684058f592202acce1b580ad1e00d178eac17c91932e6a0fbcd4b42d5e604a",
+  "engine_version": "unified_cross_market_baseline_v4_proxy_sessions",
+  "evaluation_end": "2024-12-31",
+  "evaluation_start": "1992-01-02",
+  "market": "us",
+  "market_config_path": "/Users/asscar/PycharmProjects/Cross-Market-Momentum/markets/us.yaml",
+  "market_config_sha256": "b9b98773aa6926b0ada3feac9905105658bb86d2f8ca5a59eb749ddc5b57c189",
+  "n_assets": 10593,
+  "n_data_dates": 11346,
+  "n_market_observation_dates": 8894,
+  "n_market_wide_missing_dates": 2452
+}
