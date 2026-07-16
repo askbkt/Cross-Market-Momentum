@@ -1,0 +1,4 @@
+run_id,market,lookback_label,skip_label,quantile,sharpe,annualized_return,max_drawdown,n_zero_target_rebalances,zero_target_effective_dates
+moex_lb12M_sk0M_q10,moex,12M,0M,0.1,0.8863203327616254,0.1193838863637759,-0.2229470386145555,1,2023-02-01
+moex_lb12M_sk0M_q20,moex,12M,0M,0.2,0.962554162731332,0.0931876812222887,-0.1698392345059477,1,2023-02-01
+moex_lb12M_sk0M_q30,moex,12M,0M,0.3,0.9818048547584036,0.075319273523196,-0.1495641046607372,1,2023-02-01

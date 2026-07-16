@@ -1,0 +1,64 @@
+{
+  "effective_date_rule": "next_market_session",
+  "engine_provenance": {
+    "engine_source_path": "/Users/asscar/PycharmProjects/Cross-Market-Momentum/backtests/enhanced_momentum/enhanced_momentum/backtesting/cross_market_backtest.py",
+    "engine_source_sha256": "c1684058f592202acce1b580ad1e00d178eac17c91932e6a0fbcd4b42d5e604a",
+    "engine_version": "unified_cross_market_baseline_v4_proxy_sessions"
+  },
+  "engine_version": "unified_cross_market_baseline_v4_proxy_sessions",
+  "gross_exposure": 1.0,
+  "market_horizons": {
+    "crypto": {
+      "lookbacks": {
+        "12M": 365,
+        "24M": 730,
+        "6M": 182
+      },
+      "skips": {
+        "0M": 0,
+        "1M": 30,
+        "3M": 91
+      }
+    },
+    "moex": {
+      "lookbacks": {
+        "12M": 252,
+        "24M": 504,
+        "6M": 126
+      },
+      "skips": {
+        "0M": 0,
+        "1M": 21,
+        "3M": 63
+      }
+    },
+    "us": {
+      "lookbacks": {
+        "12M": 252,
+        "24M": 504,
+        "6M": 126
+      },
+      "skips": {
+        "0M": 0,
+        "1M": 21,
+        "3M": 63
+      }
+    }
+  },
+  "markets": [
+    "moex",
+    "us",
+    "crypto"
+  ],
+  "portfolio_accounting": "fixed_notional_sleeves",
+  "quantiles": [
+    0.1,
+    0.2,
+    0.3
+  ],
+  "rebal_freq": "ME",
+  "research_role": "The grid is a robustness map. It must not be used to select the single best full-sample Sharpe configuration.",
+  "sample_policy": "Within each market, every grid configuration uses one common evaluation window. The default start is the first effective monthly rebalance date feasible for the largest lookback+skip requirement. Markets may have different evaluation windows.",
+  "signal_calendar": "market_proxy_confirmed_sessions",
+  "transaction_cost_bps": 0.0
+}
