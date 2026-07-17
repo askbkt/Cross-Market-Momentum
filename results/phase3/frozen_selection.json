@@ -1,0 +1,204 @@
+{
+  "created_at": "2026-07-17T11:16:30.248088+00:00",
+  "git_commit": "51f41d28a5650e97546c63232db3af83beb2fa4e",
+  "protocol_path": "config/phase3_protocol_v2.yaml",
+  "source_runs_dir": "results/baseline_grid_v5/runs",
+  "output_dir": "results/phase3",
+  "primary_selection_metric": "net_sharpe",
+  "primary_transaction_cost_bps": {
+    "us": 25.0,
+    "moex": 20.0,
+    "crypto": 10.0
+  },
+  "retrospective_holdout": {
+    "start": "2023-01-01",
+    "end": "2024-12-31",
+    "label": "chronological_retrospective_holdout",
+    "pristine_oos": false,
+    "note": "The holdout is excluded from algorithmic selection, but it is not described as fully pristine because full-sample baseline summaries through 2024 had already been inspected before the Phase 3 protocol correction."
+  },
+  "folds": {
+    "us": [
+      {
+        "name": "us_f1",
+        "train_start": "2010-01-01",
+        "train_end": "2014-12-31",
+        "test_start": "2015-01-01",
+        "test_end": "2015-12-31"
+      },
+      {
+        "name": "us_f2",
+        "train_start": "2010-01-01",
+        "train_end": "2015-12-31",
+        "test_start": "2016-01-01",
+        "test_end": "2016-12-31"
+      },
+      {
+        "name": "us_f3",
+        "train_start": "2010-01-01",
+        "train_end": "2016-12-31",
+        "test_start": "2017-01-01",
+        "test_end": "2017-12-31"
+      },
+      {
+        "name": "us_f4",
+        "train_start": "2010-01-01",
+        "train_end": "2017-12-31",
+        "test_start": "2018-01-01",
+        "test_end": "2018-12-31"
+      },
+      {
+        "name": "us_f5",
+        "train_start": "2010-01-01",
+        "train_end": "2018-12-31",
+        "test_start": "2019-01-01",
+        "test_end": "2019-12-31"
+      },
+      {
+        "name": "us_f6",
+        "train_start": "2010-01-01",
+        "train_end": "2019-12-31",
+        "test_start": "2020-01-01",
+        "test_end": "2020-12-31"
+      },
+      {
+        "name": "us_f7",
+        "train_start": "2010-01-01",
+        "train_end": "2020-12-31",
+        "test_start": "2021-01-01",
+        "test_end": "2021-12-31"
+      },
+      {
+        "name": "us_f8",
+        "train_start": "2010-01-01",
+        "train_end": "2021-12-31",
+        "test_start": "2022-01-01",
+        "test_end": "2022-12-31"
+      }
+    ],
+    "moex": [
+      {
+        "name": "moex_f1",
+        "train_start": "2013-01-01",
+        "train_end": "2016-12-31",
+        "test_start": "2017-01-01",
+        "test_end": "2018-12-31"
+      },
+      {
+        "name": "moex_f2",
+        "train_start": "2013-01-01",
+        "train_end": "2018-12-31",
+        "test_start": "2019-01-01",
+        "test_end": "2020-12-31"
+      },
+      {
+        "name": "moex_f3",
+        "train_start": "2013-01-01",
+        "train_end": "2020-12-31",
+        "test_start": "2021-01-01",
+        "test_end": "2021-12-31"
+      },
+      {
+        "name": "moex_f4",
+        "train_start": "2013-01-01",
+        "train_end": "2021-12-31",
+        "test_start": "2022-01-01",
+        "test_end": "2022-12-31"
+      }
+    ],
+    "crypto": [
+      {
+        "name": "crypto_f1",
+        "train_start": "2018-01-01",
+        "train_end": "2020-12-31",
+        "test_start": "2021-01-01",
+        "test_end": "2021-12-31"
+      },
+      {
+        "name": "crypto_f2",
+        "train_start": "2019-01-01",
+        "train_end": "2021-12-31",
+        "test_start": "2022-01-01",
+        "test_end": "2022-12-31"
+      }
+    ]
+  },
+  "stable_criteria": {
+    "median_train_rank_within_top_fraction": true,
+    "median_test_rank_within_top_fraction": true,
+    "min_test_top_fraction_share": 0.5,
+    "min_positive_test_sharpe_share": 0.5,
+    "max_median_absolute_rank_change_in_top_fraction_units": 1.0
+  },
+  "selection": {
+    "us": {
+      "n_eligible_configs": 27,
+      "n_stable_configs": 1,
+      "stable_config_ids": [
+        "us_lb6M_sk1M_q10"
+      ],
+      "best_frozen_single": "us_lb6M_sk1M_q10",
+      "best_frozen_single_is_stable": true,
+      "ensemble_status": "no_stable_ensemble",
+      "ensemble_members": [],
+      "base_strategy_type": "stable_single",
+      "base_strategy_is_stable": true,
+      "base_strategy_members": [
+        "us_lb6M_sk1M_q10"
+      ]
+    },
+    "moex": {
+      "n_eligible_configs": 24,
+      "n_stable_configs": 4,
+      "stable_config_ids": [
+        "moex_lb6M_sk1M_q30",
+        "moex_lb6M_sk3M_q20",
+        "moex_lb6M_sk1M_q20",
+        "moex_lb12M_sk1M_q20"
+      ],
+      "best_frozen_single": "moex_lb6M_sk1M_q30",
+      "best_frozen_single_is_stable": true,
+      "ensemble_status": "ens3",
+      "ensemble_members": [
+        "moex_lb6M_sk1M_q30",
+        "moex_lb6M_sk3M_q20",
+        "moex_lb6M_sk1M_q20"
+      ],
+      "base_strategy_type": "stable_ensemble",
+      "base_strategy_is_stable": true,
+      "base_strategy_members": [
+        "moex_lb6M_sk1M_q30",
+        "moex_lb6M_sk3M_q20",
+        "moex_lb6M_sk1M_q20"
+      ]
+    },
+    "crypto": {
+      "n_eligible_configs": 27,
+      "n_stable_configs": 2,
+      "stable_config_ids": [
+        "crypto_lb6M_sk1M_q30",
+        "crypto_lb12M_sk3M_q20"
+      ],
+      "best_frozen_single": "crypto_lb6M_sk1M_q30",
+      "best_frozen_single_is_stable": true,
+      "ensemble_status": "ens2",
+      "ensemble_members": [
+        "crypto_lb6M_sk1M_q30",
+        "crypto_lb12M_sk3M_q20"
+      ],
+      "base_strategy_type": "stable_ensemble",
+      "base_strategy_is_stable": true,
+      "base_strategy_members": [
+        "crypto_lb6M_sk1M_q30",
+        "crypto_lb12M_sk3M_q20"
+      ]
+    }
+  },
+  "guardrails": [
+    "Negative results are valid research findings.",
+    "The holdout is never used to revise folds, stability rules, finalists, or protection thresholds.",
+    "Net Sharpe is the selection metric; benchmark-relative statistics are descriptive because the strategy is market-neutral while the benchmark is long-only.",
+    "No new protection window, quantile, or logical rule may be introduced after holdout inspection.",
+    "US and MOEX strategy returns remain price-return based; ordinary cash dividends are not included."
+  ]
+}

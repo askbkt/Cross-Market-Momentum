@@ -1,0 +1,110 @@
+{
+  "created_at": "2026-07-17T11:32:20.240081+00:00",
+  "git_commit": "51f41d28a5650e97546c63232db3af83beb2fa4e",
+  "protocol_path": "config/phase3_protocol_v2.yaml",
+  "phase3_dir": "results/phase3",
+  "output_dir": "results/phase3/protection",
+  "base_selection": {
+    "us": {
+      "n_eligible_configs": 27,
+      "n_stable_configs": 1,
+      "stable_config_ids": [
+        "us_lb6M_sk1M_q10"
+      ],
+      "best_frozen_single": "us_lb6M_sk1M_q10",
+      "best_frozen_single_is_stable": true,
+      "ensemble_status": "no_stable_ensemble",
+      "ensemble_members": [],
+      "base_strategy_type": "stable_single",
+      "base_strategy_is_stable": true,
+      "base_strategy_members": [
+        "us_lb6M_sk1M_q10"
+      ]
+    },
+    "moex": {
+      "n_eligible_configs": 24,
+      "n_stable_configs": 4,
+      "stable_config_ids": [
+        "moex_lb6M_sk1M_q30",
+        "moex_lb6M_sk3M_q20",
+        "moex_lb6M_sk1M_q20",
+        "moex_lb12M_sk1M_q20"
+      ],
+      "best_frozen_single": "moex_lb6M_sk1M_q30",
+      "best_frozen_single_is_stable": true,
+      "ensemble_status": "ens3",
+      "ensemble_members": [
+        "moex_lb6M_sk1M_q30",
+        "moex_lb6M_sk3M_q20",
+        "moex_lb6M_sk1M_q20"
+      ],
+      "base_strategy_type": "stable_ensemble",
+      "base_strategy_is_stable": true,
+      "base_strategy_members": [
+        "moex_lb6M_sk1M_q30",
+        "moex_lb6M_sk3M_q20",
+        "moex_lb6M_sk1M_q20"
+      ]
+    },
+    "crypto": {
+      "n_eligible_configs": 27,
+      "n_stable_configs": 2,
+      "stable_config_ids": [
+        "crypto_lb6M_sk1M_q30",
+        "crypto_lb12M_sk3M_q20"
+      ],
+      "best_frozen_single": "crypto_lb6M_sk1M_q30",
+      "best_frozen_single_is_stable": true,
+      "ensemble_status": "ens2",
+      "ensemble_members": [
+        "crypto_lb6M_sk1M_q30",
+        "crypto_lb12M_sk3M_q20"
+      ],
+      "base_strategy_type": "stable_ensemble",
+      "base_strategy_is_stable": true,
+      "base_strategy_members": [
+        "crypto_lb6M_sk1M_q30",
+        "crypto_lb12M_sk3M_q20"
+      ]
+    }
+  },
+  "rolling_vol_window": 63,
+  "volatility_quantile": 0.9,
+  "variants": [
+    "no_protection",
+    "portfolio_vol_q90",
+    "market_vol_q90",
+    "combo_and_q90"
+  ],
+  "normal_exposure": 1.0,
+  "risk_off_exposure": 0.0,
+  "switching_turnover_convention": "0.5 * absolute exposure change",
+  "primary_transaction_cost_bps": {
+    "us": 25.0,
+    "moex": 20.0,
+    "crypto": 10.0
+  },
+  "thresholds": {
+    "us": {
+      "portfolio_vol_q90": 0.011094228793320133,
+      "market_vol_q90": 0.015818905886580463
+    },
+    "moex": {
+      "portfolio_vol_q90": 0.006285122457824494,
+      "market_vol_q90": 0.01872058733659272
+    },
+    "crypto": {
+      "portfolio_vol_q90": 0.020416322641722467,
+      "market_vol_q90": 0.048758497326850295
+    }
+  },
+  "guardrails": [
+    "Thresholds calibrated on validation only.",
+    "Volatility features shifted by one observation.",
+    "OOS features warm-started with pre-OOS history only.",
+    "Exposure state and switching costs carry across the boundary.",
+    "No holdout-based variant selection.",
+    "All frozen variants retained.",
+    "Crisis-window results are validation diagnostics only."
+  ]
+}
